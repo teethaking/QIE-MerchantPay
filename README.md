@@ -81,7 +81,7 @@ Use these Vercel settings:
 ```text
 Framework Preset: Next.js
 Root Directory: ./
-Install Command: npm --prefix frontend install
+Install Command: npm install && npm --prefix frontend install
 Build Command: npm --prefix frontend run build
 Output Directory: frontend/.next
 ```
