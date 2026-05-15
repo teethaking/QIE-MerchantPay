@@ -16,6 +16,7 @@ export default function POSPage() {
   const [session, setSession] = useState(null);
   const [fiatAmount, setFiatAmount] = useState("");
   const [quote, setQuote] = useState({ price: null, qieAmount: "0", isMock: false });
+  const [checkout, setCheckout] = useState(null);
   const [checkoutState, setCheckoutState] = useState("idle");
   const [confirmedTx, setConfirmedTx] = useState(null);
   const [pollError, setPollError] = useState("");
@@ -35,20 +36,20 @@ export default function POSPage() {
   }, []);
 
   useEffect(() => {
-    if (checkoutState !== "waiting" || !session) {
+    if (checkoutState !== "waiting" || !session || !checkout) {
       return undefined;
     }
 
-    // Start payment polling only after a QR has been generated for the current sale.
+    // Start payment polling against the immutable quote captured when this QR was generated.
     const stopPolling = pollForPayment(
       session.walletAddress,
-      quote.qieAmount,
+      checkout.qieAmount,
       (txHash) => {
         const completed = {
           date: new Date().toISOString(),
-          fiatCurrency: session.currency,
-          fiatAmount: Number(fiatAmount).toFixed(2),
-          qieAmount: quote.qieAmount,
+          fiatCurrency: checkout.currency,
+          fiatAmount: checkout.fiatAmount,
+          qieAmount: checkout.qieAmount,
           txHash,
         };
         const existing = JSON.parse(localStorage.getItem("qieMerchantTransactions") || "[]");
@@ -60,7 +61,7 @@ export default function POSPage() {
     );
 
     return stopPolling;
-  }, [checkoutState, fiatAmount, quote.qieAmount, session]);
+  }, [checkout, checkoutState, session]);
 
   function generatePaymentQr() {
     if (!Number(fiatAmount) || Number(fiatAmount) <= 0 || Number(quote.qieAmount) <= 0) {
@@ -69,11 +70,17 @@ export default function POSPage() {
     }
     setPollError("");
     setConfirmedTx(null);
+    setCheckout({
+      currency: session.currency,
+      fiatAmount: Number(fiatAmount).toFixed(2),
+      qieAmount: quote.qieAmount,
+    });
     setCheckoutState("waiting");
   }
 
   function resetSale() {
     setFiatAmount("");
+    setCheckout(null);
     setConfirmedTx(null);
     setPollError("");
     setCheckoutState("idle");
@@ -133,6 +140,7 @@ export default function POSPage() {
               onChange={(event) => {
                 setFiatAmount(event.target.value);
                 if (checkoutState !== "idle") {
+                  setCheckout(null);
                   setCheckoutState("idle");
                 }
               }}
@@ -153,7 +161,7 @@ export default function POSPage() {
 
         {checkoutState === "waiting" && (
           <div className="space-y-4">
-            <QRPayment merchantAddress={session.walletAddress} qieAmount={quote.qieAmount} />
+            <QRPayment merchantAddress={session.walletAddress} qieAmount={checkout.qieAmount} />
             <div className="rounded-3xl border border-qie/20 bg-qie/10 p-4 text-center">
               <div className="mx-auto mb-3 h-3 w-3 animate-pulse rounded-full bg-qie" />
               <p className="font-semibold text-qie">Waiting for payment…</p>

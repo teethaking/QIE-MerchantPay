@@ -116,7 +116,7 @@ async function findTokenPayment(blockNumber, merchantAddress, expectedWei) {
 export function pollForPayment(merchantAddress, expectedAmount, onConfirmed, onError) {
   // Poll QIE mainnet every 3 seconds and call onConfirmed once a matching transfer is observed.
   let stopped = false;
-  let lastCheckedBlock = 0;
+  let lastCheckedBlock = null;
   const merchant = normalizeAddress(merchantAddress);
   const expectedWei = ethers.parseUnits(String(expectedAmount || "0"), 18);
 
@@ -127,19 +127,24 @@ export function pollForPayment(merchantAddress, expectedAmount, onConfirmed, onE
 
     try {
       const blockNumber = await provider.getBlockNumber();
-      if (blockNumber <= lastCheckedBlock) {
+      if (lastCheckedBlock !== null && blockNumber <= lastCheckedBlock) {
         return;
       }
 
-      lastCheckedBlock = blockNumber;
-      const block = await provider.getBlock(blockNumber, true);
-      const nativeTx = await findNativePayment(block, merchant, expectedWei);
-      const tokenTx = nativeTx || (await findTokenPayment(blockNumber, merchant, expectedWei));
+      const fromBlock = lastCheckedBlock === null ? blockNumber : lastCheckedBlock + 1;
+      for (let currentBlock = fromBlock; currentBlock <= blockNumber; currentBlock += 1) {
+        const block = await provider.getBlock(currentBlock, true);
+        const nativeTx = await findNativePayment(block, merchant, expectedWei);
+        const tokenTx = nativeTx || (await findTokenPayment(currentBlock, merchant, expectedWei));
 
-      if (tokenTx) {
-        stopped = true;
-        onConfirmed(tokenTx);
+        if (tokenTx) {
+          stopped = true;
+          onConfirmed(tokenTx);
+          return;
+        }
       }
+
+      lastCheckedBlock = blockNumber;
     } catch (error) {
       if (onError) {
         onError(error);
