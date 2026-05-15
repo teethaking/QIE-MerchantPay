@@ -17,6 +17,8 @@ QIE MerchantPay is a mobile-first crypto point-of-sale web app for merchants acc
 ```text
 frontend/      Next.js 14 App Router application
 backend/       FastAPI service for health checks and QIE price lookup
+api/           Vercel Python function entrypoint for the FastAPI app
+vercel.json    Single-project Vercel deployment configuration
 .env.example   Environment variable reference
 ```
 
@@ -36,7 +38,7 @@ Copy the example file and adjust values if needed:
 cp .env.example .env
 ```
 
-For local development, the defaults are enough: the frontend expects the API at `http://localhost:8000`, and blockchain reads target the verified QIE mainnet JSON-RPC at `https://rpc2mainnet.qie.digital`.
+For Vercel, the frontend uses same-origin `/api` by default. For local development, set `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` in `frontend/.env.local` when running the backend on port `8000`. Blockchain reads target the verified QIE mainnet JSON-RPC at `https://rpc2mainnet.qie.digital`.
 
 ### 2. Start the backend
 
@@ -69,6 +71,37 @@ npm run dev
 ```
 
 Open `http://localhost:3000` on a phone-sized viewport or mobile device.
+
+## Deploy on Vercel
+
+Deploy the repository root as one Vercel project. The root `vercel.json` installs and builds the Next.js app from `frontend/`, serves the production output from `frontend/.next`, and rewrites `/api/*` to the FastAPI serverless function in `api/index.py`.
+
+Use these Vercel settings:
+
+```text
+Framework Preset: Next.js
+Root Directory: ./
+Install Command: npm --prefix frontend install
+Build Command: npm --prefix frontend run build
+Output Directory: frontend/.next
+```
+
+Set these environment variables in Vercel:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=/api
+NEXT_PUBLIC_QIE_RPC_URL=https://rpc2mainnet.qie.digital
+NEXT_PUBLIC_QIE_CHAIN_ID=1990
+NEXT_PUBLIC_QUSDC_CONTRACT=
+BACKEND_CORS_ORIGINS=https://<your-vercel-domain>.vercel.app
+```
+
+After deployment, verify:
+
+```bash
+curl https://<your-vercel-domain>.vercel.app/api/health
+curl 'https://<your-vercel-domain>.vercel.app/api/price?currency=USD'
+```
 
 ## Blockchain behavior
 
